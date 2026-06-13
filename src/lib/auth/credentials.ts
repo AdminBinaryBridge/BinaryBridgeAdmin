@@ -29,5 +29,25 @@ export function verifyAdminCredentials(
 }
 
 export function isAdminAuthConfigured(): boolean {
-  return Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD);
+  return Boolean(
+    process.env.ADMIN_EMAIL &&
+      process.env.ADMIN_PASSWORD &&
+      process.env.AUTH_SECRET,
+  );
+}
+
+export function getAdminAuthConfigIssue(): string | null {
+  if (!process.env.ADMIN_EMAIL) {
+    return "ADMIN_EMAIL is not set on the server.";
+  }
+
+  if (!process.env.ADMIN_PASSWORD) {
+    return "ADMIN_PASSWORD is not set on the server.";
+  }
+
+  if (!process.env.AUTH_SECRET) {
+    return "AUTH_SECRET is not set on the server.";
+  }
+
+  return null;
 }

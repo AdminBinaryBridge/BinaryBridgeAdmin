@@ -8,29 +8,41 @@ export type AdminSession = {
   email: string;
 };
 
-function getAuthSecret(): Uint8Array {
+function getAuthSecret(): Uint8Array | null {
   const secret = process.env.AUTH_SECRET;
 
   if (!secret) {
-    throw new Error("AUTH_SECRET is not configured.");
+    return null;
   }
 
   return new TextEncoder().encode(secret);
 }
 
 export async function createSessionToken(email: string): Promise<string> {
+  const secret = getAuthSecret();
+
+  if (!secret) {
+    throw new Error("AUTH_SECRET is not configured.");
+  }
+
   return new SignJWT({ email })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
-    .sign(getAuthSecret());
+    .sign(secret);
 }
 
 export async function verifySessionToken(
   token: string,
 ): Promise<AdminSession | null> {
+  const secret = getAuthSecret();
+
+  if (!secret) {
+    return null;
+  }
+
   try {
-    const { payload } = await jwtVerify(token, getAuthSecret());
+    const { payload } = await jwtVerify(token, secret);
     const email = payload.email;
 
     if (typeof email !== "string" || !email) {
@@ -56,7 +68,7 @@ export async function getSession(): Promise<AdminSession | null> {
 export async function setSessionCookie(token: string): Promise<void> {
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,

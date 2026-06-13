@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { LoginForm } from "@/app/login/login-form";
+import { getAdminAuthConfigIssue } from "@/lib/auth/credentials";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -14,6 +15,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const nextPath =
     params.next && params.next.startsWith("/admin") ? params.next : "/admin";
+  const authConfigIssue = getAdminAuthConfigIssue();
 
   return (
     <div className="flex min-h-full flex-1 items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-zinc-950">
@@ -29,6 +31,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Sign in to access the admin panel.
           </p>
         </div>
+        {authConfigIssue && (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+            Server auth is not configured: {authConfigIssue}
+          </div>
+        )}
         <LoginForm nextPath={nextPath} />
       </div>
     </div>
