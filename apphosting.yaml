@@ -7,7 +7,7 @@ runConfig:
 # Secrets must be created first: firebase apphosting:secrets:set SECRET_NAME
 env:
   - variable: ADMIN_EMAIL
-    secret: ADMIN_EMAIL
+    value: Ramodedra.work@gmail.com
     availability:
       - RUNTIME
 
