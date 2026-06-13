@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { BroadcastNotificationForm } from "@/components/admin/broadcast-notification-form";
-import { UserList } from "@/components/admin/user-list";
 import { getFirestoreStatus } from "@/lib/firebase/status";
 import { getReports } from "@/lib/firebase/reports";
 import { getUsers } from "@/lib/firebase/users";
@@ -88,8 +87,6 @@ export default async function AdminDashboardPage() {
           (r) => r.status?.toLowerCase() === "pending",
         ).length
       : 0;
-  const recentUsers =
-    usersResult.ok === true ? usersResult.users.slice(0, 5) : [];
 
   return (
     <div className="space-y-6">
@@ -133,22 +130,6 @@ export default async function AdminDashboardPage() {
         </Link>
       </div>
       <BroadcastNotificationForm userCount={userCountNumber} />
-      {recentUsers.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-              Recent users
-            </h3>
-            <Link
-              href="/admin/users"
-              className="text-xs text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
-            >
-              View all →
-            </Link>
-          </div>
-          <UserList users={recentUsers} compact />
-        </section>
-      )}
     </div>
   );
 }
