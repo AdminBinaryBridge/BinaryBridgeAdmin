@@ -1,7 +1,11 @@
+"use client";
+
+import { useState, useTransition } from "react";
 import Image from "next/image";
 
 import { formatDateTime } from "@/lib/format";
 import type { UserRecord } from "@/lib/firebase/users";
+import { setUserBlockedAction } from "@/app/admin/users/actions";
 
 type UserListProps = {
   users: UserRecord[];
@@ -39,6 +43,43 @@ function UserAvatar({ user }: { user: UserRecord }) {
   );
 }
 
+function BlockToggle({ user }: { user: UserRecord }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleToggle() {
+    const nextBlocked = !user.isBlocked;
+    const label = nextBlocked ? "block" : "unblock";
+    if (!window.confirm(`Are you sure you want to ${label} @${user.username ?? user.id}?`)) return;
+
+    setError(null);
+    startTransition(async () => {
+      const result = await setUserBlockedAction(user.id, nextBlocked);
+      if (!result.ok) setError(result.message ?? "Action failed.");
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={handleToggle}
+        disabled={isPending}
+        className={`rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+          user.isBlocked
+            ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70"
+            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        }`}
+      >
+        {isPending
+          ? user.isBlocked ? "Unblocking…" : "Blocking…"
+          : user.isBlocked ? "Blocked · Unblock" : "Block"}
+      </button>
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+    </div>
+  );
+}
+
 export function UserList({ users, compact = false }: UserListProps) {
   if (users.length === 0) {
     return (
@@ -55,10 +96,7 @@ export function UserList({ users, compact = false }: UserListProps) {
     return (
       <div className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900/50">
         {users.map((user) => (
-          <div
-            key={user.id}
-            className="flex items-center gap-3 px-4 py-3"
-          >
+          <div key={user.id} className="flex items-center gap-3 px-4 py-3">
             <UserAvatar user={user} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
@@ -83,30 +121,26 @@ export function UserList({ users, compact = false }: UserListProps) {
         <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
           <thead className="bg-zinc-50 dark:bg-zinc-900">
             <tr>
-              {[
-                "User",
-                "Username",
-                "Mobile",
-                "Gender",
-                "Country",
-                "Joined",
-                "ID",
-              ].map((heading) => (
-                <th
-                  key={heading}
-                  scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-                >
-                  {heading}
-                </th>
-              ))}
+              {["User", "Username", "Mobile", "Gender", "Country", "Joined", "ID", "Action"].map(
+                (heading) => (
+                  <th
+                    key={heading}
+                    scope="col"
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+                  >
+                    {heading}
+                  </th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {users.map((user) => (
               <tr
                 key={user.id}
-                className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40"
+                className={`hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 ${
+                  user.isBlocked ? "bg-red-50/40 dark:bg-red-950/10" : ""
+                }`}
               >
                 <td className="whitespace-nowrap px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -141,6 +175,9 @@ export function UserList({ users, compact = false }: UserListProps) {
                   title={user.id}
                 >
                   {user.id}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  <BlockToggle user={user} />
                 </td>
               </tr>
             ))}

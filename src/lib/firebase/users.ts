@@ -15,7 +15,12 @@ export type UserRecord = {
   dob: string | null;
   profileImageUri: string | null;
   createdAt: string | null;
+  isBlocked: boolean;
 };
+
+export type MutationResult =
+  | { ok: true }
+  | { ok: false; reason: "not_configured" | "error"; message?: string };
 
 export type UsersResult =
   | { ok: true; users: UserRecord[] }
@@ -79,7 +84,32 @@ function mapUserDoc(id: string, data: Record<string, unknown>): UserRecord {
     createdAt: serializeTimestamp(
       data.createdAt ?? data.created_at ?? data.created,
     ),
+    isBlocked: data.isBlocked === true || data.blocked === true,
   };
+}
+
+export async function setUserBlocked(
+  userId: string,
+  blocked: boolean,
+): Promise<MutationResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    await getAdminFirestore()
+      .collection(USERS_COLLECTION)
+      .doc(userId)
+      .update({ isBlocked: blocked });
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }
 
 export async function getUsers(): Promise<UsersResult> {
