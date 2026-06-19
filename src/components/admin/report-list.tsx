@@ -1,7 +1,19 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
 import { formatDateTime } from "@/lib/format";
-import type { ReportRecord } from "@/lib/firebase/reports";
+import type { ReportRecord, ReportStatus } from "@/lib/firebase/reports";
 
 import { ReportRowActions } from "./report-row-actions";
+
+function normalizeStatus(status: string | null): ReportStatus {
+  const value = status?.toLowerCase();
+  if (value === "resolved" || value === "dismissed" || value === "pending") {
+    return value;
+  }
+  return "pending";
+}
 
 function StatusBadge({ status }: { status: string | null }) {
   const label = status ?? "unknown";
@@ -37,11 +49,38 @@ function KindBadge({ kind }: { kind: string | null }) {
   );
 }
 
+type ReportFilter = "all" | ReportStatus;
+
+const FILTER_OPTIONS: { value: ReportFilter; label: string }[] = [
+  { value: "pending", label: "Pending" },
+  { value: "all", label: "All" },
+  { value: "resolved", label: "Resolved" },
+  { value: "dismissed", label: "Dismissed" },
+];
+
 type ReportListProps = {
   reports: ReportRecord[];
 };
 
 export function ReportList({ reports }: ReportListProps) {
+  const [filter, setFilter] = useState<ReportFilter>("pending");
+
+  const filteredReports = useMemo(() => {
+    if (filter === "all") {
+      return reports;
+    }
+    return reports.filter(
+      (report) => normalizeStatus(report.status) === filter,
+    );
+  }, [filter, reports]);
+
+  const counts = useMemo(() => {
+    const pending = reports.filter(
+      (r) => normalizeStatus(r.status) === "pending",
+    ).length;
+    return { all: reports.length, pending };
+  }, [reports]);
+
   if (reports.length === 0) {
     return (
       <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -54,6 +93,35 @@ export function ReportList({ reports }: ReportListProps) {
   }
 
   return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {FILTER_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setFilter(option.value)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              filter === option.value
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            }`}
+          >
+            {option.label}
+            {option.value === "pending" && counts.pending > 0
+              ? ` (${counts.pending})`
+              : option.value === "all"
+                ? ` (${counts.all})`
+                : ""}
+          </button>
+        ))}
+      </div>
+      {filteredReports.length === 0 ? (
+        <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900/50">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            No {filter === "all" ? "" : `${filter} `}reports to show.
+          </p>
+        </div>
+      ) : (
     <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -82,10 +150,14 @@ export function ReportList({ reports }: ReportListProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {reports.map((report) => (
+            {filteredReports.map((report) => (
               <tr
                 key={report.id}
-                className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40"
+                className={`hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 ${
+                  normalizeStatus(report.status) === "pending"
+                    ? "bg-amber-50/30 dark:bg-amber-950/10"
+                    : ""
+                }`}
               >
                 <td className="whitespace-nowrap px-4 py-3">
                   <StatusBadge status={report.status} />
@@ -136,6 +208,8 @@ export function ReportList({ reports }: ReportListProps) {
           </tbody>
         </table>
       </div>
+    </div>
+      )}
     </div>
   );
 }

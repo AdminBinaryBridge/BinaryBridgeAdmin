@@ -1,24 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { UserList } from "@/components/admin/user-list";
-import { getUsers } from "@/lib/firebase/users";
+import { PostList } from "@/components/admin/post-list";
+import { getPosts } from "@/lib/firebase/posts";
 
 export const metadata: Metadata = {
-  title: "Users",
+  title: "Posts",
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminUsersPage() {
-  const result = await getUsers();
+export default async function AdminPostsPage() {
+  const result = await getPosts();
 
   if (result.ok === false && result.reason === "not_configured") {
     return (
       <div className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            User list
+            Posts
           </h2>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             Firestore is not configured yet.
@@ -40,10 +40,10 @@ export default async function AdminUsersPage() {
       <div className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            User list
+            Posts
           </h2>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Could not load users from Firestore.
+            Could not load posts from Firestore.
           </p>
         </div>
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-100">
@@ -55,19 +55,17 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            User list
-          </h2>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {result.users.length} user{result.users.length === 1 ? "" : "s"} from
-            the Firestore <code className="font-mono text-xs">User</code>{" "}
-            collection. Click a row to view profile, posts, and reports.
-          </p>
-        </div>
+      <div>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          Posts
+        </h2>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          {result.posts.length} post{result.posts.length === 1 ? "" : "s"} from
+          the Firestore <code className="font-mono text-xs">Posts</code>{" "}
+          collection. Click a row to view the full image.
+        </p>
       </div>
-      <UserList users={result.users} />
+      <PostList posts={result.posts} />
     </div>
   );
 }

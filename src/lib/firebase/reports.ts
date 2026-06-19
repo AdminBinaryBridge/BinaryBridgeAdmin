@@ -5,6 +5,8 @@ import { isFirebaseAdminConfigured } from "./config";
 
 const REPORTS_COLLECTION = "Reports";
 
+export type ReportStatus = "pending" | "resolved" | "dismissed";
+
 export type ReportRecord = {
   id: string;
   kind: string | null;
@@ -20,6 +22,12 @@ export type ReportRecord = {
 export type ReportsResult =
   | { ok: true; reports: ReportRecord[] }
   | { ok: false; reason: "not_configured" | "error"; message?: string };
+
+export type ReportMutationResult =
+  | { ok: true }
+  | { ok: false; reason: "not_configured" | "not_found" | "error"; message?: string };
+
+const VALID_STATUSES: ReportStatus[] = ["pending", "resolved", "dismissed"];
 
 function serializeTimestamp(value: unknown): string | null {
   if (
@@ -77,6 +85,75 @@ function mapReportDoc(id: string, data: Record<string, unknown>): ReportRecord {
   };
 }
 
+export type UserReportsResult =
+  | {
+      ok: true;
+      reportsAgainst: ReportRecord[];
+      reportsFiled: ReportRecord[];
+    }
+  | { ok: false; reason: "not_configured" | "error"; message?: string };
+
+export async function getReportsForUser(user: {
+  id: string;
+  username: string | null;
+}): Promise<UserReportsResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    const db = getAdminFirestore();
+    const [againstByUidSnap, filedSnap, againstByUsernameSnap] =
+      await Promise.all([
+        db
+          .collection(REPORTS_COLLECTION)
+          .where("postUid", "==", user.id)
+          .orderBy("createdAt", "desc")
+          .get(),
+        db
+          .collection(REPORTS_COLLECTION)
+          .where("reporterUid", "==", user.id)
+          .orderBy("createdAt", "desc")
+          .get(),
+        user.username
+          ? db
+              .collection(REPORTS_COLLECTION)
+              .where("reportedUsername", "==", user.username)
+              .orderBy("createdAt", "desc")
+              .get()
+          : Promise.resolve(null),
+      ]);
+
+    const reportsAgainstMap = new Map<string, ReportRecord>();
+
+    for (const doc of againstByUidSnap.docs) {
+      reportsAgainstMap.set(doc.id, mapReportDoc(doc.id, doc.data()));
+    }
+
+    if (againstByUsernameSnap) {
+      for (const doc of againstByUsernameSnap.docs) {
+        reportsAgainstMap.set(doc.id, mapReportDoc(doc.id, doc.data()));
+      }
+    }
+
+    const reportsFiled = filedSnap.docs.map((doc) =>
+      mapReportDoc(doc.id, doc.data()),
+    );
+
+    return {
+      ok: true,
+      reportsAgainst: [...reportsAgainstMap.values()],
+      reportsFiled,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 export async function getReports(): Promise<ReportsResult> {
   if (!isFirebaseAdminConfigured()) {
     return { ok: false, reason: "not_configured" };
@@ -85,24 +162,45 @@ export async function getReports(): Promise<ReportsResult> {
   try {
     const snapshot = await getAdminFirestore()
       .collection(REPORTS_COLLECTION)
+      .orderBy("createdAt", "desc")
       .get();
 
-    const reports = snapshot.docs
-      .map((doc) => mapReportDoc(doc.id, doc.data()))
-      .sort((a, b) => {
-        if (!a.createdAt && !b.createdAt) {
-          return a.id.localeCompare(b.id);
-        }
-        if (!a.createdAt) {
-          return 1;
-        }
-        if (!b.createdAt) {
-          return -1;
-        }
-        return b.createdAt.localeCompare(a.createdAt);
-      });
+    const reports = snapshot.docs.map((doc) =>
+      mapReportDoc(doc.id, doc.data()),
+    );
 
     return { ok: true, reports };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function updateReportStatus(
+  reportId: string,
+  status: ReportStatus,
+): Promise<ReportMutationResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  if (!VALID_STATUSES.includes(status)) {
+    return { ok: false, reason: "error", message: "Invalid report status." };
+  }
+
+  try {
+    const ref = getAdminFirestore().collection(REPORTS_COLLECTION).doc(reportId);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return { ok: false, reason: "not_found", message: "Report not found." };
+    }
+
+    await ref.update({ status });
+    return { ok: true };
   } catch (error) {
     return {
       ok: false,

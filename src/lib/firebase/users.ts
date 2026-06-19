@@ -26,6 +26,10 @@ export type UsersResult =
   | { ok: true; users: UserRecord[] }
   | { ok: false; reason: "not_configured" | "error"; message?: string };
 
+export type UserResult =
+  | { ok: true; user: UserRecord }
+  | { ok: false; reason: "not_configured" | "not_found" | "error"; message?: string };
+
 function serializeTimestamp(value: unknown): string | null {
   if (
     value &&
@@ -103,6 +107,31 @@ export async function setUserBlocked(
       .update({ isBlocked: blocked });
 
     return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function getUserById(userId: string): Promise<UserResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    const doc = await getAdminFirestore()
+      .collection(USERS_COLLECTION)
+      .doc(userId)
+      .get();
+
+    if (!doc.exists) {
+      return { ok: false, reason: "not_found", message: "User not found." };
+    }
+
+    return { ok: true, user: mapUserDoc(doc.id, doc.data()!) };
   } catch (error) {
     return {
       ok: false,

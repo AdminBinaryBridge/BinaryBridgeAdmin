@@ -7,10 +7,19 @@ import { useState, useTransition } from "react";
 import {
   deleteReportedPost,
   fetchReportedPost,
+  updateReportStatusAction,
 } from "@/app/admin/reports/actions";
 import { formatDateTime } from "@/lib/format";
 import type { PostRecord } from "@/lib/firebase/posts";
-import type { ReportRecord } from "@/lib/firebase/reports";
+import type { ReportRecord, ReportStatus } from "@/lib/firebase/reports";
+
+function normalizeStatus(status: string | null): ReportStatus {
+  const value = status?.toLowerCase();
+  if (value === "resolved" || value === "dismissed" || value === "pending") {
+    return value;
+  }
+  return "pending";
+}
 
 type PostViewDialogProps = {
   post: PostRecord;
@@ -114,11 +123,82 @@ function PostViewDialog({
   );
 }
 
-type ReportRowActionsProps = {
-  report: ReportRecord;
-};
+function ReportStatusActions({ report }: { report: ReportRecord }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const status = normalizeStatus(report.status);
 
-export function ReportRowActions({ report }: ReportRowActionsProps) {
+  function handleStatusChange(nextStatus: ReportStatus, label: string) {
+    if (
+      !window.confirm(
+        `Mark this report as ${label}?${
+          nextStatus === "resolved"
+            ? " Use this when you've taken action on the report."
+            : nextStatus === "dismissed"
+              ? " Use this when no action is needed."
+              : ""
+        }`,
+      )
+    ) {
+      return;
+    }
+
+    setError(null);
+    startTransition(async () => {
+      const result = await updateReportStatusAction(report.id, nextStatus);
+      if (!result.ok) {
+        setError(result.message ?? "Could not update report.");
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap gap-2">
+        {status !== "resolved" && (
+          <button
+            type="button"
+            onClick={() => handleStatusChange("resolved", "resolved")}
+            disabled={isPending}
+            className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {isPending ? "Saving…" : "Resolve"}
+          </button>
+        )}
+        {status !== "dismissed" && (
+          <button
+            type="button"
+            onClick={() => handleStatusChange("dismissed", "dismissed")}
+            disabled={isPending}
+            className="rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            {isPending ? "Saving…" : "Dismiss"}
+          </button>
+        )}
+        {status !== "pending" && (
+          <button
+            type="button"
+            onClick={() => handleStatusChange("pending", "pending")}
+            disabled={isPending}
+            className="rounded-md border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-900 dark:text-amber-300 dark:hover:bg-amber-950/40"
+          >
+            {isPending ? "Saving…" : "Reopen"}
+          </button>
+        )}
+      </div>
+      {error && (
+        <p className="max-w-[12rem] text-xs text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PostActions({ report }: { report: ReportRecord }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [loadingPost, setLoadingPost] = useState(false);
@@ -127,7 +207,7 @@ export function ReportRowActions({ report }: ReportRowActionsProps) {
   const [error, setError] = useState<string | null>(null);
 
   if (!report.postId) {
-    return <span className="text-xs text-zinc-400">No post</span>;
+    return null;
   }
 
   const handleView = async () => {
@@ -150,14 +230,14 @@ export function ReportRowActions({ report }: ReportRowActionsProps) {
   const handleDelete = () => {
     if (
       !window.confirm(
-        "Delete this post permanently? Related likes and comments will also be removed.",
+        "Delete this post permanently? Related likes and comments will also be removed. The report will be marked as resolved.",
       )
     ) {
       return;
     }
 
     startTransition(async () => {
-      const result = await deleteReportedPost(report.postId!);
+      const result = await deleteReportedPost(report.postId!, report.id);
 
       if (result.ok === false) {
         setError(result.message ?? "Could not delete post.");
@@ -211,5 +291,18 @@ export function ReportRowActions({ report }: ReportRowActionsProps) {
         />
       )}
     </>
+  );
+}
+
+type ReportRowActionsProps = {
+  report: ReportRecord;
+};
+
+export function ReportRowActions({ report }: ReportRowActionsProps) {
+  return (
+    <div className="flex min-w-[10rem] flex-col gap-3">
+      <ReportStatusActions report={report} />
+      <PostActions report={report} />
+    </div>
   );
 }

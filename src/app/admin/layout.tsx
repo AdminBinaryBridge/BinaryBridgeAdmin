@@ -1,15 +1,8 @@
 import Link from "next/link";
 
+import { AdminNav } from "@/components/admin/admin-nav";
 import { LogoutButton } from "@/components/admin/logout-button";
 import { getSession } from "@/lib/auth/session";
-
-const nav = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/users", label: "User list" },
-  { href: "/admin/reports", label: "Reports" },
-  { href: "/admin/categories", label: "Categories" },
-  { href: "/admin/settings", label: "Settings" },
-] as const;
 
 export default async function AdminLayout({
   children,
@@ -30,17 +23,7 @@ export default async function AdminLayout({
           </Link>
           <p className="mt-0.5 text-xs text-zinc-500">Admin</p>
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 p-2">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-3 py-2 text-sm transition-colors hover:bg-zinc-800 hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <AdminNav />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-950">

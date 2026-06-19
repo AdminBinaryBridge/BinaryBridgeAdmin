@@ -19,6 +19,10 @@ export type PostRecord = {
   createdAt: string | null;
 };
 
+export type PostsResult =
+  | { ok: true; posts: PostRecord[] }
+  | { ok: false; reason: "not_configured" | "error"; message?: string };
+
 export type PostResult =
   | { ok: true; post: PostRecord }
   | { ok: false; reason: "not_configured" | "not_found" | "error"; message?: string };
@@ -82,6 +86,65 @@ function mapPostDoc(id: string, data: Record<string, unknown>): PostRecord {
       data.createdAt ?? data.created_at ?? data.created,
     ),
   };
+}
+
+export async function getPostsByUserId(userId: string): Promise<PostsResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    const snapshot = await getAdminFirestore()
+      .collection(POSTS_COLLECTION)
+      .where("uid", "==", userId)
+      .orderBy("createdAt", "desc")
+      .get();
+
+    const posts = snapshot.docs.map((doc) => mapPostDoc(doc.id, doc.data()));
+
+    return { ok: true, posts };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function getPosts(): Promise<PostsResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    const snapshot = await getAdminFirestore()
+      .collection(POSTS_COLLECTION)
+      .get();
+
+    const posts = snapshot.docs
+      .map((doc) => mapPostDoc(doc.id, doc.data()))
+      .sort((a, b) => {
+        if (!a.createdAt && !b.createdAt) {
+          return a.id.localeCompare(b.id);
+        }
+        if (!a.createdAt) {
+          return 1;
+        }
+        if (!b.createdAt) {
+          return -1;
+        }
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+
+    return { ok: true, posts };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }
 
 export async function getPostById(postId: string): Promise<PostResult> {
