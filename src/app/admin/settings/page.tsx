@@ -105,7 +105,7 @@ export default async function AdminSettingsPage() {
               <li>
                 Open{" "}
                 <a
-                  href="https://console.firebase.google.com/project/binarybridge-b4986/settings/serviceaccounts/adminsdk"
+                  href="https://console.firebase.google.com/project/binarybridge-a87e6/settings/serviceaccounts/adminsdk"
                   className="text-blue-600 underline dark:text-blue-400"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -141,7 +141,7 @@ export default async function AdminSettingsPage() {
               Alternative: add to <code className="font-mono text-xs">.env.local</code>
             </p>
             <pre className="mt-2 overflow-x-auto rounded bg-zinc-200 p-3 font-mono text-xs dark:bg-zinc-800">
-{`FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@binarybridge-b4986.iam.gserviceaccount.com
+{`FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@binarybridge-a87e6.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"`}
             </pre>
             <p className="mt-3 text-xs text-zinc-500">

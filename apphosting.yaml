@@ -22,7 +22,7 @@ env:
       - RUNTIME
 
   - variable: FIREBASE_PROJECT_ID
-    value: binarybridge-b4986
+    value: binarybridge-a87e6
     availability:
       - RUNTIME
 
@@ -37,37 +37,49 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyA8P1ABaDqassZpR6kc9Hm-kVbefRTt6KE
+    value: AIzaSyDc1nim2pmiGwbsz76K-TRbJ6-h4HrFGCo
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: binarybridge-b4986.firebaseapp.com
+    value: binarybridge-a87e6.firebaseapp.com
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: binarybridge-b4986
+    value: binarybridge-a87e6
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: binarybridge-b4986.firebasestorage.app
+    value: binarybridge-a87e6.firebasestorage.app
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "584653030507"
+    value: "818736097807"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:584653030507:web:221650c52fdecfafb35d2e
+    value: 1:818736097807:web:3f930bda2487a5b505517a
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
+    value: https://binarybridge-a87e6-default-rtdb.firebaseio.com
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: G-MRELKR5FHX
     availability:
       - BUILD
       - RUNTIME

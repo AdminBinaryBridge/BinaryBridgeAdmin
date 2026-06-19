@@ -87,6 +87,11 @@ function loadServiceAccountFromFile(): AdminCredentials | null {
   return null;
 }
 
+function projectIdFromClientEmail(clientEmail: string): string | null {
+  const match = clientEmail.match(/@(.+)\.iam\.gserviceaccount\.com$/);
+  return match?.[1] ?? null;
+}
+
 function loadAdminCredentials():
   | (AdminCredentials & { source: "env" | "json" | "file" })
   | null {
@@ -108,7 +113,7 @@ function loadAdminCredentials():
 
   if (projectId && clientEmail && privateKey) {
     return {
-      projectId,
+      projectId: projectIdFromClientEmail(clientEmail) ?? projectId,
       clientEmail,
       privateKey: privateKey.replace(/\\n/g, "\n"),
       source: "env",

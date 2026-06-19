@@ -1,4 +1,4 @@
-import { isFirebaseAdminConfigured } from "./config";
+import { getFirebaseAdminEnv, isFirebaseAdminConfigured } from "./config";
 import { getAdminFirestore } from "./admin";
 
 export type FirestoreStatus =
@@ -11,7 +11,7 @@ export async function getFirestoreStatus(): Promise<FirestoreStatus> {
     return { state: "not_configured" };
   }
 
-  const projectId = process.env.FIREBASE_PROJECT_ID!;
+  const { projectId } = getFirebaseAdminEnv();
 
   try {
     const db = getAdminFirestore();
