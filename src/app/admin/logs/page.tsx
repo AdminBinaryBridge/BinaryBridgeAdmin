@@ -62,9 +62,8 @@ export default async function AdminLogsPage() {
           Logs
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Most recent {result.logs.length} entries from the Firestore{" "}
-          <code className="font-mono text-xs">Logs</code> collection, written
-          by the app on every Firebase read/write
+          Most recent {result.logs.length} warning/error entries from the
+          Firestore <code className="font-mono text-xs">Logs</code> collection
           {errorCount > 0 && (
             <span className="text-red-600 dark:text-red-400">
               {" "}

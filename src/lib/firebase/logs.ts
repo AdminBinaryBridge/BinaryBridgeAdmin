@@ -5,9 +5,9 @@ import { isFirebaseAdminConfigured } from "./config";
 
 const LOGS_COLLECTION = "Logs";
 
-// Most recent logs fetched per request. The client (RNBinaryBridge app) writes
-// one entry per Firebase read/write/error, so this collection grows fast -
-// callers should filter by level/identifier rather than paging through all of it.
+// Most recent logs fetched per request. The client (RNBinaryBridge app) only
+// writes warn/error entries here (info/success stay device-local), so volume
+// is naturally bounded to real problems.
 const DEFAULT_LOG_LIMIT = 300;
 
 export type LogLevel = "info" | "success" | "warn" | "error";

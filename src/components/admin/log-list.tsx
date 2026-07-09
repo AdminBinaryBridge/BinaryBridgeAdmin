@@ -25,12 +25,12 @@ function LevelBadge({ level }: { level: LogLevel }) {
 
 type LogFilter = "all" | LogLevel;
 
+// The app only ever writes warn/error entries to Firestore (see LogService),
+// so those are the only filter tabs surfaced here.
 const FILTER_OPTIONS: { value: LogFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "error", label: "Errors" },
   { value: "warn", label: "Warnings" },
-  { value: "success", label: "Success" },
-  { value: "info", label: "Info" },
 ];
 
 type LogListProps = {
@@ -143,9 +143,8 @@ export function LogList({ logs }: LogListProps) {
                   const hasDetail = !!(log.meta || log.errorMessage);
 
                   return (
-                    <>
+                    <Fragment key={log.id}>
                       <tr
-                        key={log.id}
                         onClick={() =>
                           hasDetail &&
                           setExpandedId(expanded ? null : log.id)
@@ -207,7 +206,7 @@ export function LogList({ logs }: LogListProps) {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
