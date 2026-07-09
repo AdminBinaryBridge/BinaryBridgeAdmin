@@ -1,0 +1,116 @@
+{
+  "rules": {
+    "chats": {
+      "$chatId": {
+        "meta": {
+          ".read": "auth != null && (data.child('participants').child(auth.uid).val() === true || !data.exists())",
+          "participants": {
+            "$participantUid": {
+              ".write": "auth != null && (auth.uid === $participantUid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true)"
+            }
+          },
+          "lastMessage": {
+            ".write": "auth != null && (root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true || !root.child('chats').child($chatId).exists())"
+          },
+          "lastMessageAt": {
+            ".write": "auth != null && (root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true || !root.child('chats').child($chatId).exists())"
+          },
+          "lastSenderUid": {
+            ".write": "auth != null && (root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true || !root.child('chats').child($chatId).exists())"
+          },
+          "readAt": {
+            "$readerUid": {
+              ".write": "auth != null && auth.uid === $readerUid && (root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true || !root.child('chats').child($chatId).exists())"
+            }
+          }
+        },
+        "messages": {
+          ".read": "auth != null && (root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true || !root.child('chats').child($chatId).exists())",
+          "$messageId": {
+            ".write": "auth != null && ((root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true && ((!data.exists() && newData.exists() && newData.child('senderUid').val() === auth.uid && newData.hasChild('createdAt') && (newData.hasChild('text') || newData.hasChild('ct'))) || (data.exists() && !newData.exists() && data.child('senderUid').val() === auth.uid))) || (!root.child('chats').child($chatId).exists() && !data.exists() && newData.exists() && newData.child('senderUid').val() === auth.uid && newData.hasChild('createdAt') && (newData.hasChild('text') || newData.hasChild('ct'))))"
+          }
+        }
+      }
+    },
+    "userChats": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$chatId": {
+          ".write": "auth != null && auth.uid === $uid",
+          "chatId": {
+            ".write": "auth != null && (auth.uid === $uid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true) && newData.isString()"
+          },
+          "peerUid": {
+            ".write": "auth != null && (auth.uid === $uid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true) && newData.isString()"
+          },
+          "peerUsername": {
+            ".write": "auth != null && (auth.uid === $uid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true) && (newData.isString() || !newData.exists())"
+          },
+          "peerFullName": {
+            ".write": "auth != null && (auth.uid === $uid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true) && (newData.isString() || !newData.exists())"
+          },
+          "peerAvatarUrl": {
+            ".write": "auth != null && (auth.uid === $uid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true) && (newData.isString() || !newData.exists())"
+          },
+          "lastMessage": {
+            ".write": "auth != null && (auth.uid === $uid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true) && (newData.isString() || !newData.exists())"
+          },
+          "lastMessageAt": {
+            ".write": "auth != null && (auth.uid === $uid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true) && (newData.isNumber() || !newData.exists())"
+          },
+          "unread": {
+            ".write": "auth != null && (auth.uid === $uid || !root.child('chats').child($chatId).exists() || root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true) && (newData.isNumber() || !newData.exists())"
+          }
+        }
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "typing": {
+      "$chatId": {
+        "$uid": {
+          ".read": "auth != null && (root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true || !root.child('chats').child($chatId).exists())",
+          ".write": "auth != null && auth.uid === $uid && (root.child('chats').child($chatId).child('meta').child('participants').child(auth.uid).val() === true || !root.child('chats').child($chatId).exists())"
+        }
+      }
+    },
+    "feedbackThreads": {
+      ".read": "auth != null && auth.token.admin === true",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        "meta": {
+          "username": {
+            ".write": "auth != null && auth.uid === $uid && (newData.isString() || !newData.exists())"
+          },
+          "fullName": {
+            ".write": "auth != null && auth.uid === $uid && (newData.isString() || !newData.exists())"
+          },
+          "lastMessage": {
+            ".write": "auth != null && ((auth.uid === $uid && newData.isString()) || (auth.token.admin === true && newData.isString()))"
+          },
+          "lastMessageAt": {
+            ".write": "auth != null && ((auth.uid === $uid && newData.isNumber()) || (auth.token.admin === true && newData.isNumber()))"
+          },
+          "lastSenderRole": {
+            ".write": "auth != null && ((auth.uid === $uid && newData.val() === 'user') || (auth.token.admin === true && newData.val() === 'admin'))"
+          },
+          "unreadByAdmin": {
+            ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+          },
+          "unreadByUser": {
+            ".write": "auth != null && ((auth.uid === $uid && newData.val() === 0) || (auth.token.admin === true && newData.isNumber()))"
+          }
+        },
+        "messages": {
+          "$messageId": {
+            ".write": "auth != null && !data.exists() && ((auth.uid === $uid && newData.child('senderUid').val() === auth.uid && newData.child('senderRole').val() === 'user' && newData.hasChild('createdAt') && newData.hasChild('text')) || (auth.token.admin === true && newData.child('senderRole').val() === 'admin' && newData.hasChild('senderUid') && newData.hasChild('createdAt') && newData.hasChild('text')))"
+          }
+        }
+      }
+    }
+  }
+}

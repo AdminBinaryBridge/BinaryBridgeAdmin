@@ -25,7 +25,7 @@ export default async function AdminLayout({
         </div>
         <AdminNav />
       </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-950">
           <h1 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             Admin panel
@@ -39,7 +39,7 @@ export default async function AdminLayout({
             <LogoutButton />
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="min-h-0 flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>
   );
