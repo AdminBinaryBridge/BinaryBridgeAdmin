@@ -24,11 +24,17 @@ export type LogRecord = {
   platform: string | null;
   clientTime: string | null;
   createdAt: string | null;
+  resolved: boolean;
+  resolvedAt: string | null;
 };
 
 export type LogsResult =
   | { ok: true; logs: LogRecord[] }
   | { ok: false; reason: "not_configured" | "error"; message?: string };
+
+export type LogMutationResult =
+  | { ok: true }
+  | { ok: false; reason: "not_configured" | "not_found" | "error"; message?: string };
 
 const VALID_LEVELS: LogLevel[] = ["info", "success", "warn", "error"];
 
@@ -91,6 +97,8 @@ function mapLogDoc(id: string, data: Record<string, unknown>): LogRecord {
     platform: pickString(data, "platform"),
     clientTime: pickString(data, "clientTime"),
     createdAt: serializeTimestamp(data.createdAt),
+    resolved: data.resolved === true,
+    resolvedAt: serializeTimestamp(data.resolvedAt),
   };
 }
 
@@ -118,6 +126,38 @@ export async function getLogs(options?: {
     const logs = snapshot.docs.map((doc) => mapLogDoc(doc.id, doc.data()));
 
     return { ok: true, logs };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function setLogResolved(
+  logId: string,
+  resolved: boolean,
+): Promise<LogMutationResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    const ref = getAdminFirestore().collection(LOGS_COLLECTION).doc(logId);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return { ok: false, reason: "not_found", message: "Log entry not found." };
+    }
+
+    await ref.update(
+      resolved
+        ? { resolved: true, resolvedAt: new Date() }
+        : { resolved: false, resolvedAt: null },
+    );
+
+    return { ok: true };
   } catch (error) {
     return {
       ok: false,

@@ -1,7 +1,9 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Fragment, useMemo, useState, useTransition } from "react";
 
+import { setLogResolvedAction } from "@/app/admin/logs/actions";
 import { formatDateTime } from "@/lib/format";
 import type { LogLevel, LogRecord } from "@/lib/firebase/logs";
 
@@ -23,15 +25,64 @@ function LevelBadge({ level }: { level: LogLevel }) {
   );
 }
 
-type LogFilter = "all" | LogLevel;
+type LogFilter = "all" | "error" | "warn" | "fixed";
 
 // The app only ever writes warn/error entries to Firestore (see LogService),
-// so those are the only filter tabs surfaced here.
+// so those are the only level tabs surfaced here. "Fixed" is a separate view
+// over resolved entries so you can track how many bugs have been closed out.
 const FILTER_OPTIONS: { value: LogFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "error", label: "Errors" },
   { value: "warn", label: "Warnings" },
+  { value: "fixed", label: "Fixed" },
 ];
+
+function LogRowActions({ log }: { log: LogRecord }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleToggle(resolved: boolean) {
+    setError(null);
+    startTransition(async () => {
+      const result = await setLogResolvedAction(log.id, resolved);
+      if (!result.ok) {
+        setError(result.message ?? "Could not update log.");
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {log.resolved ? (
+        <button
+          type="button"
+          onClick={() => handleToggle(false)}
+          disabled={isPending}
+          className="rounded-md border border-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        >
+          {isPending ? "Saving…" : "Reopen"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => handleToggle(true)}
+          disabled={isPending}
+          className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {isPending ? "Saving…" : "Mark fixed"}
+        </button>
+      )}
+      {error && (
+        <p className="max-w-[10rem] text-xs text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 type LogListProps = {
   logs: LogRecord[];
@@ -43,20 +94,23 @@ export function LogList({ logs }: LogListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const counts = useMemo(() => {
+    const unresolved = logs.filter((l) => !l.resolved);
     return {
-      all: logs.length,
-      error: logs.filter((l) => l.level === "error").length,
-      warn: logs.filter((l) => l.level === "warn").length,
-      success: logs.filter((l) => l.level === "success").length,
-      info: logs.filter((l) => l.level === "info").length,
+      all: unresolved.length,
+      error: unresolved.filter((l) => l.level === "error").length,
+      warn: unresolved.filter((l) => l.level === "warn").length,
+      fixed: logs.filter((l) => l.resolved).length,
     };
   }, [logs]);
 
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLowerCase();
     return logs.filter((log) => {
-      if (filter !== "all" && log.level !== filter) {
-        return false;
+      if (filter === "fixed") {
+        if (!log.resolved) return false;
+      } else {
+        if (log.resolved) return false;
+        if (filter !== "all" && log.level !== filter) return false;
       }
       if (!q) {
         return true;
@@ -110,7 +164,9 @@ export function LogList({ logs }: LogListProps) {
       {filteredLogs.length === 0 ? (
         <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900/50">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            No logs match this filter.
+            {filter === "fixed"
+              ? "No logs have been marked fixed yet."
+              : "No logs match this filter."}
           </p>
         </div>
       ) : (
@@ -126,6 +182,7 @@ export function LogList({ logs }: LogListProps) {
                     "UID",
                     "Platform",
                     "Time",
+                    "Actions",
                   ].map((heading) => (
                     <th
                       key={heading}
@@ -145,26 +202,38 @@ export function LogList({ logs }: LogListProps) {
                   return (
                     <Fragment key={log.id}>
                       <tr
-                        onClick={() =>
-                          hasDetail &&
-                          setExpandedId(expanded ? null : log.id)
-                        }
                         className={`${hasDetail ? "cursor-pointer" : ""} hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 ${
                           log.level === "error"
                             ? "bg-red-50/30 dark:bg-red-950/10"
                             : ""
                         }`}
                       >
-                        <td className="whitespace-nowrap px-4 py-3">
+                        <td
+                          className="whitespace-nowrap px-4 py-3"
+                          onClick={() =>
+                            hasDetail &&
+                            setExpandedId(expanded ? null : log.id)
+                          }
+                        >
                           <LevelBadge level={log.level} />
                         </td>
                         <td
                           className="max-w-[16rem] truncate px-4 py-3 font-mono text-xs text-zinc-700 dark:text-zinc-300"
                           title={log.identifier ?? undefined}
+                          onClick={() =>
+                            hasDetail &&
+                            setExpandedId(expanded ? null : log.id)
+                          }
                         >
                           {log.identifier ?? "—"}
                         </td>
-                        <td className="max-w-sm px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
+                        <td
+                          className="max-w-sm px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300"
+                          onClick={() =>
+                            hasDetail &&
+                            setExpandedId(expanded ? null : log.id)
+                          }
+                        >
                           <p
                             className="line-clamp-2"
                             title={log.message ?? undefined}
@@ -185,11 +254,14 @@ export function LogList({ logs }: LogListProps) {
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
                           {formatDateTime(log.createdAt ?? log.clientTime)}
                         </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <LogRowActions log={log} />
+                        </td>
                       </tr>
                       {expanded && (
                         <tr key={`${log.id}-detail`}>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900"
                           >
                             {log.errorCode && (
