@@ -7,6 +7,8 @@ import {
   renameCategoryAction,
   deleteSubCategoryAction,
   renameSubCategoryAction,
+  deleteCategoriesAction,
+  deleteSubCategoriesAction,
 } from "@/app/admin/categories/actions";
 import type { CategoryRecord } from "@/lib/firebase/categories";
 
@@ -27,6 +29,24 @@ function TrashIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M1.5 3.5h10M4.5 3.5V2a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1.5M5 6v4M8 6v4M2.5 3.5l.75 8h6.5l.75-8" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+    >
+      <path d="M4 2l4 4-4 4" />
     </svg>
   );
 }
@@ -117,6 +137,91 @@ export function CategoryList({ categories }: { categories: CategoryRecord[] }) {
   const [editing, setEditing] = useState<EditingState>(null);
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  // categoryName -> Set of selected subcategory names within it.
+  const [selectedSubs, setSelectedSubs] = useState<Record<string, Set<string>>>({});
+
+  function toggleExpanded(name: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  function toggleCategorySelected(name: string) {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  function toggleSubSelected(categoryName: string, sub: string) {
+    setSelectedSubs((prev) => {
+      const current = new Set(prev[categoryName]);
+      if (current.has(sub)) current.delete(sub);
+      else current.add(sub);
+      return { ...prev, [categoryName]: current };
+    });
+  }
+
+  const selectedSubCount = Object.values(selectedSubs).reduce((sum, s) => sum + s.size, 0);
+  const selectedCount = selectedCategories.size + selectedSubCount;
+
+  function clearSelection() {
+    setSelectedCategories(new Set());
+    setSelectedSubs({});
+  }
+
+  function handleBulkDelete() {
+    const categoryNames = Array.from(selectedCategories);
+
+    // Subcategory selections belonging to a category that's also selected wholesale
+    // are redundant — deleting the category already removes them.
+    const itemsByCategory: Record<string, string[]> = {};
+    for (const [categoryName, subs] of Object.entries(selectedSubs)) {
+      if (selectedCategories.has(categoryName) || subs.size === 0) continue;
+      itemsByCategory[categoryName] = Array.from(subs);
+    }
+
+    const subCount = Object.values(itemsByCategory).reduce((sum, s) => sum + s.length, 0);
+    const parts = [];
+    if (categoryNames.length > 0) parts.push(`${categoryNames.length} categor${categoryNames.length === 1 ? "y" : "ies"} (with all their subcategories)`);
+    if (subCount > 0) parts.push(`${subCount} subcategor${subCount === 1 ? "y" : "ies"}`);
+
+    if (!window.confirm(`Delete ${parts.join(" and ")}? This cannot be undone.`)) return;
+
+    setActionError(null);
+    startTransition(async () => {
+      const results = await Promise.all([
+        categoryNames.length > 0
+          ? (() => {
+              const fd = new FormData();
+              fd.set("names", JSON.stringify(categoryNames));
+              return deleteCategoriesAction(fd);
+            })()
+          : Promise.resolve({ ok: true as const }),
+        subCount > 0
+          ? (() => {
+              const fd = new FormData();
+              fd.set("itemsByCategory", JSON.stringify(itemsByCategory));
+              return deleteSubCategoriesAction(fd);
+            })()
+          : Promise.resolve({ ok: true as const }),
+      ]);
+
+      const failed = results.find((r) => !r.ok) as { ok: false; message?: string } | undefined;
+      if (failed) {
+        setActionError(failed.message ?? "Failed to delete selection.");
+      } else {
+        clearSelection();
+      }
+    });
+  }
 
   function cancelEdit() {
     setEditing(null);
@@ -193,9 +298,37 @@ export function CategoryList({ categories }: { categories: CategoryRecord[] }) {
           {actionError}
         </div>
       )}
+
+      {selectedCount > 0 && (
+        <div className="flex items-center gap-3 rounded-md border border-zinc-300 bg-zinc-100 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+            {selectedCount} selected
+          </span>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={isPending}
+            className="ml-auto rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+          >
+            {isPending ? "Deleting…" : "Delete selected"}
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={isPending}
+            className="rounded px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 disabled:opacity-50 dark:hover:text-zinc-300"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {categories.map((category) => {
         const isEditingThisCategory =
           editing?.type === "category" && editing.name === category.name;
+        const isExpanded = expanded.has(category.name);
+        const isCategorySelected = selectedCategories.has(category.name);
+        const categorySelectedSubs = selectedSubs[category.name];
 
         return (
           <div
@@ -216,9 +349,24 @@ export function CategoryList({ categories }: { categories: CategoryRecord[] }) {
                 </div>
               ) : (
                 <>
-                  <p className="flex-1 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                    {category.name}
-                  </p>
+                  <input
+                    type="checkbox"
+                    checked={isCategorySelected}
+                    onChange={() => toggleCategorySelected(category.name)}
+                    disabled={isPending}
+                    aria-label={`Select category "${category.name}"`}
+                    className="size-4 shrink-0 rounded border-zinc-300 dark:border-zinc-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(category.name)}
+                    className="flex flex-1 items-center gap-2 text-left"
+                  >
+                    <ChevronIcon expanded={isExpanded} />
+                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                      {category.name}
+                    </span>
+                  </button>
                   <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
                     {category.subcategories.length}
                   </span>
@@ -242,58 +390,68 @@ export function CategoryList({ categories }: { categories: CategoryRecord[] }) {
             </div>
 
             {/* Subcategory list */}
-            {category.subcategories.length > 0 ? (
-              <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {category.subcategories.map((sub, index) => {
-                  const isEditingThisSub =
-                    editing?.type === "subcategory" &&
-                    editing.categoryName === category.name &&
-                    editing.sub === sub;
+            {isExpanded &&
+              (category.subcategories.length > 0 ? (
+                <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {category.subcategories.map((sub, index) => {
+                    const isEditingThisSub =
+                      editing?.type === "subcategory" &&
+                      editing.categoryName === category.name &&
+                      editing.sub === sub;
+                    const isSubSelected = categorySelectedSubs?.has(sub) ?? false;
 
-                  return (
-                    <li key={index} className="flex items-center gap-3 px-4 py-2">
-                      <span className="w-5 shrink-0 text-right font-mono text-xs text-zinc-400">
-                        {index}
-                      </span>
-                      {isEditingThisSub ? (
-                        <div className="flex flex-1 items-center">
-                          <InlineEditInput
-                            value={editing.value}
-                            onChange={(v) => setEditing({ ...editing, value: v })}
-                            onSave={saveEdit}
-                            onCancel={cancelEdit}
-                            disabled={isPending}
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          <span className="flex-1 text-sm text-zinc-700 dark:text-zinc-300">
-                            {sub}
-                          </span>
-                          <ActionButton
-                            variant="edit"
-                            title={`Rename "${sub}"`}
-                            disabled={isPending || editing !== null}
-                            onClick={() => {
-                              setActionError(null);
-                              setEditing({ type: "subcategory", categoryName: category.name, sub, value: sub });
-                            }}
-                          />
-                          <ActionButton
-                            variant="delete"
-                            title={`Delete "${sub}"`}
-                            disabled={isPending || editing !== null}
-                            onClick={() => handleDeleteSubCategory(category.name, sub)}
-                          />
-                        </>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="px-4 py-3 text-sm text-zinc-400">No subcategories.</p>
-            )}
+                    return (
+                      <li key={index} className="flex items-center gap-3 px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={isSubSelected}
+                          onChange={() => toggleSubSelected(category.name, sub)}
+                          disabled={isPending}
+                          aria-label={`Select subcategory "${sub}"`}
+                          className="size-4 shrink-0 rounded border-zinc-300 dark:border-zinc-600"
+                        />
+                        <span className="w-5 shrink-0 text-right font-mono text-xs text-zinc-400">
+                          {index}
+                        </span>
+                        {isEditingThisSub ? (
+                          <div className="flex flex-1 items-center">
+                            <InlineEditInput
+                              value={editing.value}
+                              onChange={(v) => setEditing({ ...editing, value: v })}
+                              onSave={saveEdit}
+                              onCancel={cancelEdit}
+                              disabled={isPending}
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <span className="flex-1 text-sm text-zinc-700 dark:text-zinc-300">
+                              {sub}
+                            </span>
+                            <ActionButton
+                              variant="edit"
+                              title={`Rename "${sub}"`}
+                              disabled={isPending || editing !== null}
+                              onClick={() => {
+                                setActionError(null);
+                                setEditing({ type: "subcategory", categoryName: category.name, sub, value: sub });
+                              }}
+                            />
+                            <ActionButton
+                              variant="delete"
+                              title={`Delete "${sub}"`}
+                              disabled={isPending || editing !== null}
+                              onClick={() => handleDeleteSubCategory(category.name, sub)}
+                            />
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="px-4 py-3 text-sm text-zinc-400">No subcategories.</p>
+              ))}
           </div>
         );
       })}

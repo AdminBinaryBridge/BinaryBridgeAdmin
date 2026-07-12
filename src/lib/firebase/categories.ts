@@ -216,6 +216,63 @@ export async function deleteSubCategory(
   }
 }
 
+export async function deleteCategories(names: string[]): Promise<MutationResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+  if (names.length === 0) return { ok: true };
+
+  try {
+    const update: Record<string, FirebaseFirestore.FieldValue> = {};
+    for (const name of names) update[name] = FieldValue.delete();
+
+    await getAdminFirestore()
+      .collection(CATEGORIES_COLLECTION)
+      .doc(CATEGORIES_DOC)
+      .update(update);
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+// itemsByCategory: category name -> list of subcategory names to remove from it.
+export async function deleteSubCategories(
+  itemsByCategory: Record<string, string[]>,
+): Promise<MutationResult> {
+  if (!isFirebaseAdminConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  const entries = Object.entries(itemsByCategory).filter(([, subs]) => subs.length > 0);
+  if (entries.length === 0) return { ok: true };
+
+  try {
+    const update: Record<string, FirebaseFirestore.FieldValue> = {};
+    for (const [categoryName, subs] of entries) {
+      update[categoryName] = FieldValue.arrayRemove(...subs);
+    }
+
+    await getAdminFirestore()
+      .collection(CATEGORIES_COLLECTION)
+      .doc(CATEGORIES_DOC)
+      .update(update);
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 export async function getCategories(): Promise<CategoriesResult> {
   if (!isFirebaseAdminConfigured()) {
     return { ok: false, reason: "not_configured" };
