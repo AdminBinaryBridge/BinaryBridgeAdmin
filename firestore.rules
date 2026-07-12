@@ -83,6 +83,14 @@ service cloud.firestore {
         && request.auth.uid == resource.data.actorUid;
     }
 
+    match /SiteVisits/{visitId} {
+      allow read: if false;
+      allow create: if request.resource.data.keys().hasOnly(['path', 'referrer', 'createdAt'])
+        && request.resource.data.path is string
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
     match /PushRequests/{requestId} {
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.senderUid

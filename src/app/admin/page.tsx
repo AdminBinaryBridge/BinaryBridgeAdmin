@@ -9,6 +9,7 @@ import { getAdminBroadcastHistory } from "@/lib/firebase/notifications";
 import { getPosts } from "@/lib/firebase/posts";
 import { getReports } from "@/lib/firebase/reports";
 import { getUsers } from "@/lib/firebase/users";
+import { getSiteVisitStats } from "@/lib/firebase/visits";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -92,14 +93,21 @@ function FirestoreBanner({
 }
 
 export default async function AdminDashboardPage() {
-  const [firestoreStatus, usersResult, reportsResult, postsResult, broadcastHistoryResult] =
-    await Promise.all([
-      getFirestoreStatus(),
-      getUsers(),
-      getReports(),
-      getPosts(),
-      getAdminBroadcastHistory(),
-    ]);
+  const [
+    firestoreStatus,
+    usersResult,
+    reportsResult,
+    postsResult,
+    broadcastHistoryResult,
+    visitStatsResult,
+  ] = await Promise.all([
+    getFirestoreStatus(),
+    getUsers(),
+    getReports(),
+    getPosts(),
+    getAdminBroadcastHistory(),
+    getSiteVisitStats(),
+  ]);
 
   const dataReady =
     usersResult.ok && reportsResult.ok && postsResult.ok;
@@ -163,6 +171,14 @@ export default async function AdminDashboardPage() {
                 href="/admin/reports"
                 accent={metrics.reports.pending > 0 ? "warning" : "default"}
               />
+              {visitStatsResult.ok && (
+                <MetricCard
+                  label="Website visits"
+                  value={visitStatsResult.stats.total}
+                  hint={`${visitStatsResult.stats.today} today · View details →`}
+                  href="/admin/visits"
+                />
+              )}
             </div>
           </section>
 
