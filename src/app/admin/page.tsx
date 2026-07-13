@@ -3,6 +3,12 @@ import Link from "next/link";
 
 import { BroadcastNotificationForm } from "@/components/admin/broadcast-notification-form";
 import { BroadcastHistory } from "@/components/admin/broadcast-history";
+import {
+  FlagIcon,
+  GlobeIcon,
+  ImageIcon,
+  UsersIcon,
+} from "@/components/admin/icons";
 import { computeDashboardMetrics } from "@/lib/admin/dashboard-metrics";
 import { getFirestoreStatus } from "@/lib/firebase/status";
 import { getAdminBroadcastHistory } from "@/lib/firebase/notifications";
@@ -23,30 +29,48 @@ function MetricCard({
   hint,
   href,
   accent,
+  icon: Icon,
 }: {
   label: string;
   value: string | number;
   hint: string;
   href?: string;
   accent?: "default" | "warning" | "danger";
+  icon: (props: import("react").SVGProps<SVGSVGElement>) => React.JSX.Element;
 }) {
   const accentStyles = {
     default:
-      "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50 hover:border-zinc-300 dark:hover:border-zinc-700",
+      "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50 hover:border-violet-300 hover:shadow-md dark:hover:border-violet-800",
     warning:
-      "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 hover:border-amber-300 dark:hover:border-amber-800",
+      "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 hover:border-amber-300 hover:shadow-md dark:hover:border-amber-800",
     danger:
-      "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20 hover:border-red-300 dark:hover:border-red-800",
+      "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20 hover:border-red-300 hover:shadow-md dark:hover:border-red-800",
   };
 
-  const className = `rounded-lg border p-4 shadow-sm transition-colors ${accentStyles[accent ?? "default"]}`;
+  const chipStyles = {
+    default:
+      "bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
+    warning:
+      "bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400",
+    danger:
+      "bg-red-500/10 text-red-600 dark:bg-red-500/15 dark:text-red-400",
+  };
+
+  const className = `group rounded-lg border p-4 shadow-sm transition-all ${accentStyles[accent ?? "default"]}`;
 
   const content = (
     <>
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
+      <div className="flex items-start justify-between">
+        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          {label}
+        </p>
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-105 ${chipStyles[accent ?? "default"]}`}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+      <p className="mt-3 text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
         {value}
       </p>
       <p className="mt-1 text-xs text-zinc-500">{hint}</p>
@@ -138,7 +162,8 @@ export default async function AdminDashboardPage() {
       {metrics ? (
         <>
           <section className="space-y-3">
-            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+            <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+              <span className="h-4 w-1 rounded-full bg-violet-500" />
               Overview
             </h3>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -147,18 +172,21 @@ export default async function AdminDashboardPage() {
                 value={metrics.users.total}
                 hint={`${metrics.users.today} joined today · View all →`}
                 href="/admin/users"
+                icon={UsersIcon}
               />
               <MetricCard
                 label="New this week"
                 value={metrics.users.week}
                 hint="Signups in the last 7 days"
                 href="/admin/users"
+                icon={UsersIcon}
               />
               <MetricCard
                 label="Total posts"
                 value={metrics.posts.total}
                 hint={`${metrics.posts.week} posted this week · Browse →`}
                 href="/admin/posts"
+                icon={ImageIcon}
               />
               <MetricCard
                 label="Pending reports"
@@ -170,6 +198,7 @@ export default async function AdminDashboardPage() {
                 }
                 href="/admin/reports"
                 accent={metrics.reports.pending > 0 ? "warning" : "default"}
+                icon={FlagIcon}
               />
               {visitStatsResult.ok && (
                 <MetricCard
@@ -177,13 +206,15 @@ export default async function AdminDashboardPage() {
                   value={visitStatsResult.stats.total}
                   hint={`${visitStatsResult.stats.today} today · View details →`}
                   href="/admin/visits"
+                  icon={GlobeIcon}
                 />
               )}
             </div>
           </section>
 
           <section className="space-y-3">
-            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+            <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+              <span className="h-4 w-1 rounded-full bg-red-500" />
               Moderation
             </h3>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -193,24 +224,28 @@ export default async function AdminDashboardPage() {
                 hint="Active blocks on accounts"
                 href="/admin/users"
                 accent={metrics.users.blocked > 0 ? "danger" : "default"}
+                icon={UsersIcon}
               />
               <MetricCard
                 label="Resolved reports"
                 value={metrics.reports.resolved}
                 hint="Marked as handled"
                 href="/admin/reports"
+                icon={FlagIcon}
               />
               <MetricCard
                 label="Dismissed reports"
                 value={metrics.reports.dismissed}
                 hint="No action taken"
                 href="/admin/reports"
+                icon={FlagIcon}
               />
               <MetricCard
                 label="All reports"
                 value={metrics.reports.total}
                 hint="Total in Firestore"
                 href="/admin/reports"
+                icon={FlagIcon}
               />
             </div>
           </section>

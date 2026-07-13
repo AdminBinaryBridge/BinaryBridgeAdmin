@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, useMemo, useState, useTransition } from "react";
 
 import { setLogResolvedAction } from "@/app/admin/logs/actions";
-import { formatDateTime } from "@/lib/format";
+import { dateKey, formatDateHeading, formatTime } from "@/lib/format";
 import type { LogLevel, LogRecord } from "@/lib/firebase/logs";
 
 function LevelBadge({ level }: { level: LogLevel }) {
@@ -92,6 +92,21 @@ export function LogList({ logs }: LogListProps) {
   const [filter, setFilter] = useState<LogFilter>("error");
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  function toggleDate(key: string) {
+    setCollapsedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
 
   const counts = useMemo(() => {
     const unresolved = logs.filter((l) => !l.resolved);
@@ -123,6 +138,24 @@ export function LogList({ logs }: LogListProps) {
       );
     });
   }, [filter, logs, query]);
+
+  const groupedLogs = useMemo(() => {
+    const groups = new Map<string, LogRecord[]>();
+    for (const log of filteredLogs) {
+      const key = dateKey(log.createdAt ?? log.clientTime);
+      const group = groups.get(key);
+      if (group) {
+        group.push(log);
+      } else {
+        groups.set(key, [log]);
+      }
+    }
+    return Array.from(groups.entries()).map(([key, entries]) => ({
+      key,
+      heading: formatDateHeading(entries[0]?.createdAt ?? entries[0]?.clientTime ?? null),
+      entries,
+    }));
+  }, [filteredLogs]);
 
   if (logs.length === 0) {
     return (
@@ -170,120 +203,160 @@ export function LogList({ logs }: LogListProps) {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
-              <thead className="bg-zinc-50 dark:bg-zinc-900">
-                <tr>
-                  {[
-                    "Level",
-                    "Identifier",
-                    "Message",
-                    "UID",
-                    "Platform",
-                    "Time",
-                    "Actions",
-                  ].map((heading) => (
-                    <th
-                      key={heading}
-                      scope="col"
-                      className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {filteredLogs.map((log) => {
-                  const expanded = expandedId === log.id;
-                  const hasDetail = !!(log.meta || log.errorMessage);
+        <div className="space-y-3">
+          {groupedLogs.map((group) => {
+            const dateCollapsed = collapsedDates.has(group.key);
 
-                  return (
-                    <Fragment key={log.id}>
-                      <tr
-                        className={`${hasDetail ? "cursor-pointer" : ""} hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 ${
-                          log.level === "error"
-                            ? "bg-red-50/30 dark:bg-red-950/10"
-                            : ""
-                        }`}
-                      >
-                        <td
-                          className="whitespace-nowrap px-4 py-3"
-                          onClick={() =>
-                            hasDetail &&
-                            setExpandedId(expanded ? null : log.id)
-                          }
-                        >
-                          <LevelBadge level={log.level} />
-                        </td>
-                        <td
-                          className="max-w-[16rem] truncate px-4 py-3 font-mono text-xs text-zinc-700 dark:text-zinc-300"
-                          title={log.identifier ?? undefined}
-                          onClick={() =>
-                            hasDetail &&
-                            setExpandedId(expanded ? null : log.id)
-                          }
-                        >
-                          {log.identifier ?? "—"}
-                        </td>
-                        <td
-                          className="max-w-sm px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300"
-                          onClick={() =>
-                            hasDetail &&
-                            setExpandedId(expanded ? null : log.id)
-                          }
-                        >
-                          <p
-                            className="line-clamp-2"
-                            title={log.message ?? undefined}
-                          >
-                            {log.message ?? "—"}
-                            {log.errorMessage ? ` — ${log.errorMessage}` : ""}
-                          </p>
-                        </td>
-                        <td
-                          className="max-w-[8rem] truncate px-4 py-3 font-mono text-xs text-zinc-500"
-                          title={log.uid ?? undefined}
-                        >
-                          {log.uid ?? "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-500">
-                          {log.platform ?? "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
-                          {formatDateTime(log.createdAt ?? log.clientTime)}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <LogRowActions log={log} />
-                        </td>
-                      </tr>
-                      {expanded && (
-                        <tr key={`${log.id}-detail`}>
-                          <td
-                            colSpan={7}
-                            className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900"
-                          >
-                            {log.errorCode && (
-                              <p className="mb-2 text-xs text-zinc-600 dark:text-zinc-400">
-                                <span className="font-medium">Error code:</span>{" "}
-                                {log.errorCode}
-                              </p>
-                            )}
-                            {log.meta && (
-                              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-zinc-100 p-3 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                                {JSON.stringify(log.meta, null, 2)}
-                              </pre>
-                            )}
-                          </td>
+            return (
+              <div
+                key={group.key}
+                className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/50"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleDate(group.key)}
+                  className="flex w-full items-center justify-between gap-2 bg-zinc-50 px-4 py-2.5 text-left hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${
+                        dateCollapsed ? "" : "rotate-90"
+                      }`}
+                    >
+                      <path d="M6 4l8 6-8 6V4z" />
+                    </svg>
+                    {group.heading}
+                  </span>
+                  <span className="text-xs text-zinc-500">
+                    {group.entries.length}{" "}
+                    {group.entries.length === 1 ? "entry" : "entries"}
+                  </span>
+                </button>
+
+                {!dateCollapsed && (
+                  <div className="overflow-x-auto border-t border-zinc-200 dark:border-zinc-800">
+                    <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
+                      <thead className="bg-zinc-50 dark:bg-zinc-900">
+                        <tr>
+                          {[
+                            "Level",
+                            "Identifier",
+                            "Message",
+                            "UID",
+                            "Platform",
+                            "Time",
+                            "Actions",
+                          ].map((heading) => (
+                            <th
+                              key={heading}
+                              scope="col"
+                              className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-zinc-500"
+                            >
+                              {heading}
+                            </th>
+                          ))}
                         </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                        {group.entries.map((log) => {
+                          const expanded = expandedId === log.id;
+                          const hasDetail = !!(log.meta || log.errorMessage);
+
+                          return (
+                            <Fragment key={log.id}>
+                              <tr
+                                className={`${hasDetail ? "cursor-pointer" : ""} hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 ${
+                                  log.level === "error"
+                                    ? "bg-red-50/30 dark:bg-red-950/10"
+                                    : ""
+                                }`}
+                              >
+                                <td
+                                  className="whitespace-nowrap px-4 py-3"
+                                  onClick={() =>
+                                    hasDetail &&
+                                    setExpandedId(expanded ? null : log.id)
+                                  }
+                                >
+                                  <LevelBadge level={log.level} />
+                                </td>
+                                <td
+                                  className="max-w-[16rem] truncate px-4 py-3 font-mono text-xs text-zinc-700 dark:text-zinc-300"
+                                  title={log.identifier ?? undefined}
+                                  onClick={() =>
+                                    hasDetail &&
+                                    setExpandedId(expanded ? null : log.id)
+                                  }
+                                >
+                                  {log.identifier ?? "—"}
+                                </td>
+                                <td
+                                  className="max-w-sm px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300"
+                                  onClick={() =>
+                                    hasDetail &&
+                                    setExpandedId(expanded ? null : log.id)
+                                  }
+                                >
+                                  <p
+                                    className="line-clamp-2"
+                                    title={log.message ?? undefined}
+                                  >
+                                    {log.message ?? "—"}
+                                    {log.errorMessage
+                                      ? ` — ${log.errorMessage}`
+                                      : ""}
+                                  </p>
+                                </td>
+                                <td
+                                  className="max-w-[8rem] truncate px-4 py-3 font-mono text-xs text-zinc-500"
+                                  title={log.uid ?? undefined}
+                                >
+                                  {log.uid ?? "—"}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-500">
+                                  {log.platform ?? "—"}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-sm text-zinc-600 dark:text-zinc-300">
+                                  {formatTime(log.createdAt ?? log.clientTime)}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3">
+                                  <LogRowActions log={log} />
+                                </td>
+                              </tr>
+                              {expanded && (
+                                <tr key={`${log.id}-detail`}>
+                                  <td
+                                    colSpan={7}
+                                    className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900"
+                                  >
+                                    {log.errorCode && (
+                                      <p className="mb-2 text-xs text-zinc-600 dark:text-zinc-400">
+                                        <span className="font-medium">
+                                          Error code:
+                                        </span>{" "}
+                                        {log.errorCode}
+                                      </p>
+                                    )}
+                                    {log.meta && (
+                                      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-zinc-100 p-3 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                                        {JSON.stringify(log.meta, null, 2)}
+                                      </pre>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
